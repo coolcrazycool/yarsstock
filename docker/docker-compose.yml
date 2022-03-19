@@ -1,0 +1,190 @@
+version: "3"
+services:
+    airflow-postgres:
+      image: postgres:14.0
+      environment:
+        POSTGRES_DB: "airflow"
+        POSTGRES_USER: "airflow"
+        POSTGRES_PASSWORD: "airflow"
+      volumes:
+        - ./docker-airflow/pg-init-scripts:/docker-entrypoint-initdb.d
+      expose:
+        - "5433"
+      command: -p 5433
+      ports:
+        - "5433:5433"
+
+    data-postgres:
+      image: postgres:14.0
+      environment:
+        POSTGRES_DB: "postgres"
+        POSTGRES_USER: "postgres"
+        POSTGRES_PASSWORD: "postgres"
+        PGDATA: "/var/lib/postgresql/data/pgdata"
+      volumes:
+        - ./data-postgres/sql-scripts:/docker-entrypoint-initdb.d
+        - ./data-postgres/db-data:/var/lib/postgresql/data
+      expose:
+        - "5445"
+      ports:
+        - "5445:5445"
+      command: -p 5445
+      healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+        start_period: 10s
+      restart: unless-stopped
+      deploy:
+        resources:
+          limits:
+            cpus: '1'
+            memory: 4G
+
+    airflow-webserver:
+      image: tobysevans/docker-airflow-spark:1.10.15_3.1.2
+      restart: always
+      depends_on:
+        - airflow-postgres
+      environment:
+        - LOAD_EX=n
+        - EXECUTOR=Local
+      volumes:
+        - ../dags:/usr/local/airflow/dags #DAG folder
+        - ../spark/app:/usr/local/spark/app #Spark Scripts (Must be the same path in airflow and Spark Cluster)
+        - ../spark/resources:/usr/local/spark/resources #Resources folder (Must be the same path in airflow and Spark Cluster)
+      ports:
+        - "8282:8282"
+      command: webserver
+      healthcheck:
+        test: ["CMD-SHELL", "[ -f /usr/local/airflow/airflow-webserver.pid ]"]
+        interval: 30s
+        timeout: 30s
+        retries: 3
+
+  spark-master:
+    image: bde2020/spark-master:3.2.0-hadoop3.2
+    container_name: spark-master
+    ports:
+      - "8082:8080"
+      - "7077:7077"
+    environment:
+      - INIT_DAEMON_STEP=setup_spark
+    volumes:
+      - ../spark/app:/usr/local/spark/app # Spark scripts folder (Must be the same path in airflow and Spark Cluster)
+      - ../spark/resources:/usr/local/spark/resources #Resources folder (Must be the same path in airflow and Spark Cluster)
+
+  spark-worker-1:
+    image: bde2020/spark-worker:3.2.0-hadoop3.2
+    container_name: spark-worker-1
+    depends_on:
+      - spark-master
+    ports:
+      - "8181:8181"
+    environment:
+      - "SPARK_MASTER=spark://spark-master:7077"
+    volumes:
+      - ../spark/app:/usr/local/spark/app # Spark scripts folder (Must be the same path in airflow and Spark Cluster)
+      - ../spark/resources:/usr/local/spark/resources #Resources folder (Must be the same path in airflow and Spark Cluster)
+
+  #Jupyter notebook
+  jupyter-spark:
+    image: jupyter/pyspark-notebook:spark-3.2.1
+    ports:
+      - "8888:8888"
+      - "4040-4080:4040-4080"
+    volumes:
+      - ../notebooks:/home/razumovskiy-da/work/notebooks/
+      - ../spark/resources/data:/home/razumovskiy-da/work/data/
+      - ../spark/resources/jars:/home/razumovskiy-da/work/jars/
+
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    #volumes:
+    #  - hadoop_namenode:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=test
+    env_file:
+      - ./hadoop/hadoop.env
+    ports:
+      - 8020:8020
+      - 50070:50070
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    #volumes:
+    #  - hadoop_datanode:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:50070"
+    env_file:
+      - ./hadoop/hadoop.env
+    ports:
+      - 50075:50075
+
+  resourcemanager:
+    image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
+    container_name: resourcemanager
+    environment:
+      SERVICE_PRECONDITION: "namenode:50070 datanode:50075"
+    env_file:
+      - ./hadoop/hadoop.env
+    ports:
+      - 8088:8088
+      - 8032:8032
+
+  nodemanager1:
+    image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
+    container_name: nodemanager
+    environment:
+      SERVICE_PRECONDITION: "namenode:50070 datanode:50075 resourcemanager:8088"
+    env_file:
+      - ./hadoop/hadoop.env
+    depends_on:
+      - namenode
+      - resourcemanager
+    ports:
+      - 8042:8042
+
+  hive-server:
+    container_name: hive-server
+    image: bde2020/hive:2.3.2-postgresql-metastore
+    env_file:
+      - ./hadoop/hadoop-hive.env
+    environment:
+      HIVE_CORE_CONF_javax_jdo_option_ConnectionURL: "jdbc:postgresql://hive-metastore/metastore"
+      SERVICE_PRECONDITION: "hive-metastore:9083"
+    ports:
+      - "10000:10000"
+
+  hive-metastore:
+    container_name: hive-metastore
+    image: bde2020/hive:2.3.2-postgresql-metastore
+    env_file:
+      - ./hadoop/hadoop-hive.env
+    command: /opt/hive/bin/hive --service metastore
+    environment:
+      SERVICE_PRECONDITION: "namenode:50070 datanode:50075 hive-metastore-postgresql:5432"
+    ports:
+      - "9083:9083"
+
+  hive-metastore-postgresql:
+    container_name: hive-metastore-postgresql
+    image: bde2020/hive-metastore-postgresql:3.1.0
+
+  historyserver:
+    image: bde2020/hadoop-historyserver:2.0.0-hadoop3.2.1-java8
+    container_name: historyserver
+    #volumes:
+    #  - hadoop_historyserver:/hadoop/yarn/timeline
+    environment:
+      SERVICE_PRECONDITION: "namenode:50070 datanode:50075 resourcemanager:8088"
+    depends_on:
+      - resourcemanager
+    env_file:
+      - ./hadoop/hadoop.env
+    ports:
+      - 8188:8188
+      - 19888:19888
