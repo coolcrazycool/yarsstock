@@ -1,0 +1,152 @@
+version: "3"
+
+services:
+ postgres:
+  build:
+    context: ./postgres
+    labels:
+      description: "Image for Postgres DB for bigdata framework"
+  image: bigdata-postgres:1.0
+
+ redis:
+    build:
+      context: ./redis
+      labels:
+        description: "Iamge for Redis DB for bigdata framework"
+    image: bigdata-redis:1.0
+  
+ airflow-base:
+  build:
+    context: ./airflow/base
+    labels:
+      description: "Base image for Airflow Nodes"
+  image: airflow-base:1.0
+  
+ airflow-webui:
+  build:
+    context: ./airflow/webui
+    labels:
+      description: "Image for Airflow WebUI for bigdata framework"
+  image: airflow-webui:1.0
+  links:
+     - "airflow-base"
+
+ airflow-scheduler:
+  build:
+    context: ./airflow/scheduler
+    labels:
+      description: "Image for Airflow Scheduler for bigdata framework"
+  image: airflow-scheduler:1.0
+  links:
+     - "airflow-base"
+
+ airflow-worker:
+  build:
+    context: ./airflow/worker
+    labels:
+      description: "Image for Airflow Worker for bigdata framework"
+  image: airflow-worker:1.0
+  links:
+     - "airflow-base"
+
+ hadoop-base:
+  build: 
+    context: ./hadoop/base
+    labels:
+      description: "Base Image for Hadoop Nodes"
+  image: hadoop-base:1.0
+
+ hadoop-namenode:
+  build:
+    context: ./hadoop/namenode
+    labels:
+      description: "Image for Hadoop NameNode"
+  image: hadoop-namenode:1.0
+  links:
+     - "hadoop-base"
+
+ hadoop-datanode:
+  build:
+    context: ./hadoop/datanode
+    labels:
+      description: "Image for Hadoop DataNode"
+  image: hadoop-datanode:1.0
+  links:
+     - "hadoop-base"
+
+ yarn-nodemanager:
+  build:
+    context: ./hadoop/nodemanager
+    labels:
+      description: "Image for Hadoop Node Manager"
+  image: yarn-nodemanager:1.0
+  links:
+     - "hadoop-base"
+
+ yarn-resourcemanger:
+  build:
+    context: ./hadoop/resourcemanager
+    labels:
+      description: "Image for Yarn Resource Manager"
+  image: yarn-resourcemanager:1.0
+  links:
+     - "hadoop-base"
+
+ yarn-historyserver:
+  build:
+    context: ./hadoop/historyserver
+    labels:
+      description: "Image for Yarn timeline Server"
+  image: yarn-historyserver:1.0
+  links:
+     - "hadoop-base"
+
+ hive-base:
+  build:
+    context: ./hive/base
+    labels:
+      description: "Base Image for Hive Nodes"
+  image: hive-base:1.0
+  links:
+     - "hadoop-base"
+
+ hive-metastore:
+  build:
+    context: ./hive/metastore
+    labels:
+      description: "Image for Hive MetaStore Server"
+  image: hive-metastore:1.0
+  links:
+     - "hive-base"
+
+ spark-base:
+  build:
+     context: ./spark/base
+     labels:
+       description: "Base image for Spark"
+  image: spark-base:1.0
+
+ spark-master:
+  build:
+    context: ./spark/master
+    labels:
+      description: "Spark master Node"
+  image: spark-master:1.0
+  links:
+     - "spark-base"
+
+ spark-worker:
+  build:
+    context: ./spark/worker
+    labels:
+      description: "Spark Worker Node"
+  image: spark-worker:1.0
+  links:
+     - "spark-base"
+
+ kafka:
+  build:
+    context: ./kafka
+    labels:
+      description: "Kafka Node"
+  image: bigdata-kafka:1.0
