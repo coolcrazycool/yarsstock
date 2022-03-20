@@ -1,0 +1,11 @@
+{
+  "databases": [
+    {
+      "type": "data",
+      "driver": "org.postgresql.Driver",
+      "url": "jdbc:postgresql:world",
+      "user": "postgres",
+      "password": "postgres"
+    }
+  ]
+}

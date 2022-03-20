@@ -1,0 +1,43 @@
+{
+  "api": {
+    "url": "https://api.twelvedata.com/",
+    "apiToken": "",
+    "functions": [
+      {
+        "name": "list_symbols",
+        "value": "stocks"
+      }
+    ],
+    "schemas": [
+      {
+        "name": "symbol_schema",
+        "fields": [
+          {
+            "name": "symbol",
+            "type": "StringType"
+          },
+          {
+            "name": "name",
+            "type": "StringType"
+          },
+          {
+            "name": "currency",
+            "type": "StringType"
+          },
+          {
+            "name": "exchange",
+            "type": "StringType"
+          },
+          {
+            "name": "country",
+            "type": "StringType"
+          },
+          {
+            "name": "type",
+            "type": "StringType"
+          }
+        ]
+      }
+    ]
+  }
+}
