@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM ubuntu:16.10
 LABEL Description="Base image for BigData Cluster Nodes" \
       Author="Razumovskiy Dmitriy <diman-rraazz@mail.ru>"
 
